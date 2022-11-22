@@ -1,8 +1,16 @@
 # external modules
 from pathlib import Path
+from .config import Config
+from .assign import Assignment
 import zipfile
 import shutil
 import subprocess
+from .utils import peek
+import warnings
+
+from otter.utils import loggers
+
+LOGGER = loggers.get_logger(__name__)
 
 class Grader:
     """
@@ -31,21 +39,24 @@ class Grader:
     such that all assignments can be graded by otter grader and the results can be matched
     """
     
-    def __init__(self, src: str, dest: str, dist: str):
+    def __init__(self, config: Config, src: str, dest: str):
         """
+        :param config: ograder config
+        :type config: Config
+        
         :param src: path to a zip file containing all assignments.
-        :type nrows: str
+        :type src: str
         
         :param dest: path of a directory where the evaluation / auto-grading will be executed.
-        :type nrows: str
+        :type dest: str
         
         :rtype: Grader
         :return: A new grader to grade from a moodle download.
         
         """
+        self.config = config
         self.src : Path = Path(src)
         self.dest : Path = Path(dest)
-        self.dist : Path = Path(dist)
         self.zips = Path('zips')
         self.invalid = Path('invalid')
         
@@ -115,10 +126,10 @@ class Grader:
             else:
                 new_path = Path(self.dest / self.zips / (zip_file.name))
                 zip_file.rename(new_path)
-                
-            print(f'valid assignment: {zip_file} -> {new_path}')    
+            
+            LOGGER.info(f'unpack valid assignment: {zip_file} -> {new_path}')
             shutil.rmtree(str(directory))
-            print(f'{directory} deleted')    
+            LOGGER.info(f'{directory} deleted')    
         
         for directory in invalid_dirs: 
             student_name = self.__extract_name(directory)
@@ -129,24 +140,45 @@ class Grader:
                 new_path = Path(self.dest / self.invalid / (directory.name))
                 directory.rename(new_path)
             
-            print(f'invalid assignment: {directory} -> {new_path}')
-                    
-    def __find_master(self):
-        return next(self.dist.glob('**/*.zip'))
-            
+            LOGGER.info(f'unpack invalid assignment: {directory} -> {new_path}')  
+    
     #otter grade -p zips -a dist/autograder/CT-WS2022-Pyramiden-autograder_2022_10_30T20_44_42_546298.zip -vz --timeout 60
-    def grade(self, timeout_in_sec=120):
+    def grade(self, assignment: Assignment, timeout_in_sec=120, clear=False):
         """
         grades the assignments contained in the zip file.
         Invalid assignment directories are moved to the invalid directory.
         They will not be auto-graded.
         """
-        subprocess.check_call(['otter', 'grade', 
-            '-p', str(Path(self.dest / self.zips)),
-            '-a', str(self.__find_master()), 
-            '-o', str(self.dest), 
-            '-vz', 
-            '--timeout', str(timeout_in_sec)])
+        
+        if clear:
+            self.clear()
+        
+        if not self.dest.exists():
+            self.unpack()
+        
+        if(peek(assignment.autograder_dir).glob('**/*.zip')):
+            LOGGER.info(f'found autograder .zip for assignment {assignment}')
+            file = next(assignment.autograder_dir).glob('**/*.zip')
+            LOGGER.info(f'otter grade -p {Path(self.dest / self.zips)} -a {file} -o {self.dest} -vz --timeout {timeout_in_sec}')
+            subprocess.check_call(['otter', 'grade', 
+                '-p', str(Path(self.dest / self.zips)),
+                '-a', str(next(assignment.autograder_dir).glob('**/*.zip')), 
+                '-o', str(self.dest), 
+                '-vz', 
+                '--timeout', str(timeout_in_sec)])
+        elif peek(assignment.autograder_dir).glob('**/*.ipynb'):
+            LOGGER.info(f'found autograder .ipynb for assignment {assignment}')
+            file = next(assignment.autograder_dir).glob('**/*.ipynb')
+            LOGGER.info(f'otter grade -p {Path(self.dest / self.zips)} -a {file} -o {self.dest} -v --timeout {timeout_in_sec}')
+            subprocess.check_call(['otter', 'grade', 
+                '-p', str(Path(self.dest / self.zips)),
+                '-a', str(next(assignment.autograder_dir).glob('**/*.zip')), 
+                '-o', str(self.dest), 
+                '-v', 
+                '--timeout', str(timeout_in_sec)])
+        else:
+            warnings.warn(f'missing autograder file for {assignment}')
+        
     
-def main(src: str, dest : str = 'assignments', dist : str ='dist'):
-    Grader(src, dest, dist).grade()
+#def main(src: str, dest : str = 'assignments', dist : str ='dist'):
+#    Grader(src, dest, dist).grade()

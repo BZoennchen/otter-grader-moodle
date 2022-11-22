@@ -3,20 +3,21 @@ from pathlib import Path
 import fica
 import yaml
 
-def load(config_file):
-    with open(config_file, 'r') as file:
-        config = yaml.safe_load(file)
-    return Config(config)
+from otter.utils import loggers
+
+LOGGER = loggers.get_logger(__name__)
 
 class Config(fica.Config):
     root_dir = fica.Key()
     semester = fica.Key()
+    exercises = fica.Key()
+    assignments = fica.Key()
                 
     def __init__(self, user_config, documentation_mode=False):
         if not documentation_mode:
             user_config['root_dir'] = Path(user_config['root_dir'])
             semester_dir = user_config['root_dir'] / Path(user_config['semester'])
-            user_config['assign']['master_dir'] = semester_dir/ Path(user_config['assign']['master_dir'])
+            user_config['assign']['main_dir'] = semester_dir/ Path(user_config['assign']['main_dir'])
             user_config['assign']['students_dir'] = semester_dir / Path(user_config['assign']['students_dir'])
             user_config['assign']['solutions_dir'] = semester_dir / Path(user_config['assign']['solutions_dir'])
             user_config['assign']['autograder_dir'] = semester_dir  / Path(user_config['assign']['autograder_dir'])
@@ -24,7 +25,7 @@ class Config(fica.Config):
         super().__init__(user_config, documentation_mode=documentation_mode)
         
     class AssignmentConfig(fica.Config):
-        master_dir = fica.Key()
+        main_dir = fica.Key()
         students_dir = fica.Key()
         solutions_dir = fica.Key()
         autograder_dir = fica.Key()
@@ -62,14 +63,22 @@ class Config(fica.Config):
             app = fica.Key()
             git_lab_branch = fica.Key()
             
-        class GitMasterConfig(fica.Config):
+        class GitMainConfig(fica.Config):
             git_lab_repo = fica.Key()
             path = fica.Key()
         
         students = fica.Key(subkey_container=GitStudentConfig)
-        master = fica.Key(subkey_container=GitMasterConfig)
+        main = fica.Key(subkey_container=GitMainConfig)
         
     assign = fica.Key(subkey_container=AssignmentConfig)
     git = fica.Key(subkey_container=GitConfig)
     otter_notebook_config = fica.Key(subkey_container=OtterNotebookConfig)
                     
+def load(config_file: str) -> Config: 
+    try:
+        with open(config_file, 'r') as file:
+            config = yaml.safe_load(file)
+        return Config(config)
+    except Exception as e:
+        LOGGER.error("could read/load the ograder config file: {config_file}")
+        raise e
