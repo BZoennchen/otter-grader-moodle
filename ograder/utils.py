@@ -1,6 +1,7 @@
 import itertools
+from typing import Any
 
-def peek(iterable):
+def peek(iterable) -> Any:
     try:
         first = next(iterable)
     except StopIteration:

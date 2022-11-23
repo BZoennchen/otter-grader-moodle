@@ -60,14 +60,14 @@ class Grader:
         self.zips = Path('zips')
         self.invalid = Path('invalid')
         
-    def clear(self):
+    def clear(self) -> None:
         """
         deletes the assignments directory.
         """
         if self.dest.exists():
             shutil.rmtree(str(self.dest))
         
-    def __unzip(self):
+    def __unzip(self) -> None:
         """
         unzips the zip file that contains all assignments directories.
         """
@@ -78,7 +78,7 @@ class Grader:
         with zipfile.ZipFile(self.src, 'r') as zip_ref:
             zip_ref.extractall(self.dest)
     
-    def __is_valid(self, assignment_dict: Path):
+    def __is_valid(self, assignment_dict: Path) -> bool:
         """
         True if and only if the assignment directory (of a student) is valid.
         """
@@ -90,13 +90,13 @@ class Grader:
         for file in assignment_dict.iterdir():
             return file.suffix == '.zip'
         
-    def __get_zip_assignment(self, assignment_dict: Path):
+    def __get_zip_assignment(self, assignment_dict: Path) -> Path:
         """
         returns the path of the first zip file inside assignment_dict
         """
         return next(assignment_dict.glob('*.zip'))
     
-    def __extract_name(self, student_dir):
+    def __extract_name(self, student_dir) -> str:
         """
         constructs and returns a nice name by extracting information from the assignment directory name
         """
@@ -105,7 +105,7 @@ class Grader:
         student_name = student_name.replace(' ', '_')
         return student_name        
     
-    def unpack(self, rename=True):
+    def unpack(self, rename=True) -> None:
         """
         Unpacks all the files in the zip file.
         Invalid assignment directories are moved to the invalid directory.
@@ -143,7 +143,7 @@ class Grader:
             LOGGER.info(f'unpack invalid assignment: {directory} -> {new_path}')  
     
     #otter grade -p zips -a dist/autograder/CT-WS2022-Pyramiden-autograder_2022_10_30T20_44_42_546298.zip -vz --timeout 60
-    def grade(self, assignment: Assignment, timeout_in_sec=120, clear=False):
+    def grade(self, assignment: Assignment, timeout_in_sec=120, clear=False) -> None:
         """
         grades the assignments contained in the zip file.
         Invalid assignment directories are moved to the invalid directory.

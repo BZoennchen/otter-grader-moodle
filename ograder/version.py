@@ -16,7 +16,7 @@ LOGO_WITH_VERSION = fr"""
                            v{__version__}
 """[1:]                
 
-def print_version_info(logo=False):
+def print_version_info(logo=False) -> None:
     """
     Prints the ograder logo and version information to stdout
     Args:

@@ -10,8 +10,6 @@ LOGGER = loggers.get_logger(__name__)
 class Config(fica.Config):
     root_dir = fica.Key()
     semester = fica.Key()
-    exercises = fica.Key()
-    assignments = fica.Key()
                 
     def __init__(self, user_config, documentation_mode=False):
         if not documentation_mode:
@@ -30,6 +28,9 @@ class Config(fica.Config):
         solutions_dir = fica.Key()
         autograder_dir = fica.Key()
         tmp_dir = fica.Key()
+        
+    class ExecisesConfig(fica.Config):        
+        exercises = fica.Key(type_=list, default=[])
         
     class OtterNotebookConfig(fica.Config):
         init_cell = fica.Key()
@@ -69,11 +70,13 @@ class Config(fica.Config):
         
         students = fica.Key(subkey_container=GitStudentConfig)
         main = fica.Key(subkey_container=GitMainConfig)
-        
+    
     assign = fica.Key(subkey_container=AssignmentConfig)
     git = fica.Key(subkey_container=GitConfig)
     otter_notebook_config = fica.Key(subkey_container=OtterNotebookConfig)
-                    
+    exercises = fica.Key(subkey_container=ExecisesConfig)
+    assignments = fica.Key(subkey_container=ExecisesConfig)
+              
 def load(config_file: str) -> Config: 
     try:
         with open(config_file, 'r') as file:
