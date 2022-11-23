@@ -95,8 +95,8 @@ def upgrade(override: bool):
 
     config = load_config()
     project = Project(config)
-    project.init(exist_ok=True)
-    project.init_notebooks(override=override, exist_ok=True)         
+    #project.init(exist_ok=True)
+    project.upgrade_notebooks()         
 
 cli.add_command(init)
 cli.add_command(upgrade)

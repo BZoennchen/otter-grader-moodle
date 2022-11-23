@@ -4,8 +4,8 @@ from .assign import Assignment
 class Project:
     def __init__(self, config):
         self.config = config
-        self.exercises = [Assignment(self.config, name=exercise['exercise'], assignment=False) for exercise in self.config.exercises]
-        self.assignments = [Assignment(self.config, name=exercise['exercise'], assignment=True) for exercise in self.config.assignments]
+        self.exercises : list[Assignment] = [Assignment(self.config, name=exercise['exercise'], assignment=False) for exercise in self.config.exercises]
+        self.assignments : list[Assignment] = [Assignment(self.config, name=exercise['exercise'], assignment=True) for exercise in self.config.assignments]
 
     def init(self, exist_ok=True) -> None:
         self.config.root_dir.mkdir(parents=True, exist_ok=True)
@@ -20,7 +20,14 @@ class Project:
             
         for assignment in self.assignments:
             assignment.init_notebook(save=True, override=override, exist_ok=exist_ok)
+    
+    def upgrade_notebooks(self) -> None:
+        for exercise in self.exercises:
+            exercise.upgrade_notebook()
             
+        for assignment in self.assignments:
+            assignment.upgrade_notebook()
+    
     def generate_all(self, run_tests=True) -> None:
         for exercise in self.exercises:
             exercise.generate(run_tests=run_tests)

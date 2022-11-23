@@ -4,7 +4,7 @@ import subprocess
 import shutil
 import yaml
 
-from .utils import peek
+from .utils import peek, is_empty
 from otter.utils import loggers
 from pathlib import Path
 from ograder.config import Config
@@ -38,21 +38,31 @@ class Assignment():
         
     def upgrade_notebook(self) -> None:
         notebook = self.__read_notebook()
-        if not notebook == None:
+        if notebook == None:
             LOGGER.warn(f'Could not upgrade notebook for assignment {self}, since it does not exists.')
             return
-        cells = notebook.get_cells()
-        
+        cells = notebook.cells
+                
         otter_config_dict = self.config.otter_notebook_config.get_user_config()
         otter_config_dict['name'] = self.name
         if self.instructions != None:
-            otter_config_dict['instructions'] = self.instructions
+            otter_config_dict['export_cell']['instructions'] = self.instructions
         otter_raw_config = yaml.safe_dump(otter_config_dict, allow_unicode=True)
         
-        if len(cells) >= 0:
-            cells.append(otter_raw_config)
+        
+        if len(cells) == 0:
+            cells.append(nbformat.v4.new_raw_cell(otter_raw_config))
         else:
-            cells[0] = otter_raw_config
+            new_cells = list(cells)
+            cells.clear()
+            cells.append(nbformat.v4.new_raw_cell(otter_raw_config))
+            first = True
+            for cell in new_cells:
+                if not first:
+                    cells.append(cell)
+                first = False
+        notebook.cells = cells
+        print(notebook)
         self.__save(notebook, override=True, exist_ok=True)
         
     
@@ -76,17 +86,20 @@ class Assignment():
         if self.main_notebook_exists():
             notebook_path = self.__find_notebook(self.main_dir)
         else:
-            notebook_path = self.main_dir / Path(self.name + 'ipynb')
+            notebook_path = self.main_dir / Path(self.name + '.ipynb')
             
         if notebook_path.exists() and override:
             notebook_path.unlink()
         
         if notebook_path.exists() and not exist_ok:
-            warnings.warn(f'could not create notebook {notebook_path} since it already exists!')
+            warnings.warn(f'Could not create notebook {notebook_path} since it already exists!')
         else:
-            with open(str(notebook_path), mode='w', encoding="utf-8") as file:
-                nbformat.write(notebook, file) 
-        
+            with open(str(notebook_path), mode='w', encoding='utf-8') as file:
+                try:
+                    file.write(nbformat.writes(notebook))
+                    #nbformat.write(notebook, file) 
+                except Exception as e:
+                    LOGGER.error(f'Could not write to {file}.')        
     
     def generate(self, run_tests:bool=True) -> None:        
         try:
@@ -123,7 +136,7 @@ class Assignment():
              
     def main_notebook_exists(self) -> bool:
         if self.main_dir.exists():
-            return peek(self.main_dir.glob('*.ipynb')) != None
+            return not is_empty(self.main_dir.glob('*.ipynb'))
         return False
      
     def remove_notebooks(self, main=False) -> None:
@@ -154,12 +167,16 @@ class Assignment():
             #print(f'remove {self.autograder_dir}')
     
     def __read_notebook(self) -> nbformat.NotebookNode:
-        notebook = None
-        if peek(self.main_dir.glob('*.ipynb')) != None:
-            path_to_notebook = next(self.main_dir.glob('*.ipynb'))
-            with open(path_to_notebook) as file:
-                notebook = nbformat.read(file, as_version=nbformat.NO_CONVERT)
-        return notebook
+        path_to_notebook, _ = peek(self.main_dir.glob('*.ipynb'))
+        if path_to_notebook != None:
+            print(path_to_notebook)
+            with open(path_to_notebook, mode='r', encoding='utf-8') as file:
+                try:
+                    notebook = nbformat.read(file, as_version=nbformat.NO_CONVERT)
+                    return notebook
+                except Exception as e:
+                    LOGGER.error(f'Could not read from {file}')
+                    return None
         
     def __find_notebook(self, dir : Path) -> Path:
         return next(dir.glob('*.ipynb'))

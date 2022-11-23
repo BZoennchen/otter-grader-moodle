@@ -5,7 +5,7 @@ from .assign import Assignment
 import zipfile
 import shutil
 import subprocess
-from .utils import peek
+from .utils import peek, is_empty
 import warnings
 
 from otter.utils import loggers
@@ -89,12 +89,14 @@ class Grader:
             return False
         for file in assignment_dict.iterdir():
             return file.suffix == '.zip'
+            
         
     def __get_zip_assignment(self, assignment_dict: Path) -> Path:
         """
         returns the path of the first zip file inside assignment_dict
         """
-        return next(assignment_dict.glob('*.zip'))
+        element, rest = peek(assignment_dict.glob('*.zip'))
+        return element
     
     def __extract_name(self, student_dir) -> str:
         """
@@ -156,7 +158,7 @@ class Grader:
         if not self.dest.exists():
             self.unpack()
         
-        if(peek(assignment.autograder_dir).glob('**/*.zip')):
+        if not is_empty(assignment.autograder_dir).glob('**/*.zip'):
             LOGGER.info(f'found autograder .zip for assignment {assignment}')
             file = next(assignment.autograder_dir).glob('**/*.zip')
             LOGGER.info(f'otter grade -p {Path(self.dest / self.zips)} -a {file} -o {self.dest} -vz --timeout {timeout_in_sec}')
@@ -166,7 +168,7 @@ class Grader:
                 '-o', str(self.dest), 
                 '-vz', 
                 '--timeout', str(timeout_in_sec)])
-        elif peek(assignment.autograder_dir).glob('**/*.ipynb'):
+        elif not is_empty(assignment.autograder_dir).glob('**/*.ipynb'):
             LOGGER.info(f'found autograder .ipynb for assignment {assignment}')
             file = next(assignment.autograder_dir).glob('**/*.ipynb')
             LOGGER.info(f'otter grade -p {Path(self.dest / self.zips)} -a {file} -o {self.dest} -v --timeout {timeout_in_sec}')
