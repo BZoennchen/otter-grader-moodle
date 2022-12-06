@@ -33,13 +33,22 @@ def assign(tests: bool, names: list[str]):
     (2) solution: a notebook that contains the solution
     (3) autograder: a zip file to grade the students solution
     """
+    return __assign(tests, names)
+
+def __assign(tests: bool, names: list[str]):
+    """
+    Generates for each assignment, identified by names, all three required parts: 
+    (1) student: a notebook that contains the exercise without the solution
+    (2) solution: a notebook that contains the solution
+    (3) autograder: a zip file to grade the students solution
+    """
     config = load_config()
     assignments = []
     if len(names) > 0:
         for name in names:
             assignment = Assignment(config, name)
             if assignment.main_notebook_exists():
-                assignment.generate(tests)
+                assignment.generate(run_tests=tests)
                 assignments.append(assignment)
             else:
                 click.echo(f'main notebook for {assignment} does not exists.', err=True)
@@ -53,8 +62,8 @@ def assign(tests: bool, names: list[str]):
 @_verbosity
 @click.option('-c', '--clear', default= False, is_flag=True, show_default=True, type=bool, help='Remove all unpacked files and restart from new.')
 @click.argument('name')
-@click.argument('src', type=click.File('rb'))
-@click.argument('dst', type=click.Path())
+@click.argument('src', type=str)
+@click.argument('dst', type=str)
 def grade(clear: bool, name: str, src: str, dst: str):
     """
     Grades an existing assignment wherer src is the path to a zip file containing all submissions.
@@ -63,13 +72,13 @@ def grade(clear: bool, name: str, src: str, dst: str):
     Args:
         clear (bool): clear everything and re-run it. If you have manipluated the submission your changes will be lost.
         name (str): name of the assignment
-        src (str): the path to the zip file containing all submissions
+        src (str): the path to the directory containing all submissions (a directory for each student with a otter-zip-file)
         dst (str): the path to a directory at which everything will be extracted and graded.
     """
     
-    assignment = assign(tests=True, names=[name])
+    assignments = __assign(tests=True, names=[name])
     grader = Grader(load_config(), src, dst)
-    grader.grade(assignment, clear=clear)
+    grader.grade(assignments[0], clear=clear)
 
 @click.command()
 @_verbosity
