@@ -2,7 +2,7 @@
 from pathlib import Path
 from .config import Config
 from .assign import Assignment
-import zipfile
+
 import shutil
 import subprocess
 from .utils import peek, is_empty
@@ -173,7 +173,7 @@ class Grader:
             LOGGER.info(f'found autograder .zip for assignment {assignment}')
             file = next(assignment.autograder_dir.glob('**/*.zip'))
             LOGGER.info(f'otter grade -p {Path(self.dest / self.zips)} -a {file} -o {self.dest} -vz --timeout {timeout_in_sec}')
-            subprocess.check_call(['otter', 'grade', 
+            subprocess.check_call(['otter', 'grade',
                 '-p', str(Path(self.dest / self.zips)),
                 '-a', str(next(assignment.autograder_dir.glob('**/*.zip'))), 
                 '-o', str(self.dest), 
