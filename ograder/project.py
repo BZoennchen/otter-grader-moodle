@@ -21,9 +21,9 @@ class Project:
             return False
         return (self.config.root_dir / Path(self.config.semester)).exists()
 
-    def init(self, override=False, exist_ok=False) -> None:
+    def init(self, n=0, override=False, exist_ok=False) -> None:
         self.init_directories(exist_ok)
-        self.init_notebooks(override, exist_ok)
+        self.init_notebooks(n, override, exist_ok)
     
     def init_directories(self, exist_ok=True) -> None:
         self.config.root_dir.mkdir(parents=True, exist_ok=True)
@@ -32,29 +32,43 @@ class Project:
         self.config.assign.solutions_dir.mkdir(parents=True, exist_ok=exist_ok)
         self.config.assign.autograder_dir.mkdir(parents=True, exist_ok=exist_ok)
     
-    def init_notebooks(self, override=False, exist_ok=False) -> None:
+    def init_notebooks(self, n=0, override=False, exist_ok=False) -> None:
         for exercise in self.exercises:
-            exercise.init_notebook(save=True, override=override, exist_ok=exist_ok)
+            exercise.init_notebook(n, save=True, override=override, exist_ok=exist_ok)
             
         for assignment in self.assignments:
-            assignment.init_notebook(save=True, override=override, exist_ok=exist_ok)
+            assignment.init_notebook(n, save=True, override=override, exist_ok=exist_ok)
+    
+    def add_questions(self, n: int):
+        for exercise in self.exercises:
+            exercise.add_questions(n)
+            
+        for assignment in self.assignments:
+            assignment.add_questions(n)
     
     def grade_all(self, timeout=None):
         pass
     
-    def upgrade_notebooks(self) -> None:
+    def upgrade_notebooks(self, n=0) -> None:
         for exercise in self.exercises:
-            exercise.upgrade_notebook()
+            exercise.upgrade_notebook(n)
             
         for assignment in self.assignments:
-            assignment.upgrade_notebook()
+            assignment.upgrade_notebook(n)
     
     def generate_all(self, run_tests=True) -> None:
         for exercise in self.exercises:
             exercise.generate(run_tests=run_tests)
             
         for assignment in self.assignments:
-            assignment.generate(run_tests=run_tests)        
+            assignment.generate(run_tests=run_tests)
+    
+    def read_questions(self) -> None:
+        for exercise in self.exercises:
+            exercise.read_questions()
+            
+        for assignment in self.assignments:
+            assignment.read_questions()        
     
     def all_assignments(self) -> list[Assignment]:
         return self.exercises + self.assignments

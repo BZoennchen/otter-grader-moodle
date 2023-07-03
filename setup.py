@@ -4,7 +4,7 @@ from setuptools import setup
 packages = \
     ['ograder']
 
-install_requires = ['pyyaml', 'fica', 'nbformat', 'click']
+install_requires = ['pyyaml', 'fica', 'nbformat', 'click', 'otter-grader']
 
 package_data = \
     {'': ['*']}
