@@ -1,3 +1,6 @@
+# openAI key
+*.key
+
 # mac os
 *.DS_Store
 
@@ -16,6 +19,9 @@ __pycache__/
 
 # C extensions
 *.so
+
+# test dir
+test/
 
 # Distribution / packaging
 .Python

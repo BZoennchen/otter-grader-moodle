@@ -7,6 +7,7 @@ from .assign import Assignment
 import ograder.config as conf
 import os
 from otter.cli import _verbosity
+from .gpt import ChatGPT
 
 CONFIG_PATH = os.path.expanduser("~") + '/ograder.yml'
 
@@ -15,6 +16,7 @@ def load_config() -> conf.Config:
     Loads and returns the ograder configuration which defines
     the structure of your ograder projects.
 
+    \b
     Returns:
         conf.Config: the ograder user specific configuration
     """
@@ -37,18 +39,19 @@ def cli(version, config):
 
 @click.command()
 @_verbosity
-@click.option('-t', '--tests', default= True, is_flag=True, show_default=True, type=bool, help='prevents the evaluation of tests.')
+@click.option('-s', '--skip_seal', default= False, is_flag=True, show_default=True, type=bool, help='prevent sealing')
+@click.option('-t', '--run_tests', default= False, is_flag=True, show_default=True, type=bool, help='run otter tests.')
 @click.argument('names', nargs=-1)
-def assign(tests: bool, names: list[str]):
+def assign(skip_seal:bool, run_tests: bool, names: list[str]):
     """
     Generates for each assignment, identified by names, all three required parts:
     (1) student: a notebook that contains the exercise without the solution
     (2) solution: a notebook that contains the solution
     (3) autograder: a zip file to grade the students solution
     """
-    return __assign(tests, names)
+    return __assign(skip_seal, run_tests, names)
 
-def __assign(tests: bool, names: list[str]):
+def __assign(skip_seal:bool, run_tests: bool, names: list[str]):
     """
     Generates for each assignment, identified by names, all three required parts: 
     (1) student: a notebook that contains the exercise without the solution
@@ -61,13 +64,13 @@ def __assign(tests: bool, names: list[str]):
         for name in names:
             assignment = Assignment(config, name)
             if assignment.main_notebook_exists():
-                assignment.generate(run_tests=tests)
+                assignment.generate(run_tests=run_tests, seal_student_nb=(not skip_seal))
                 assignments.append(assignment)
             else:
                 click.echo(f'main notebook for {assignment} does not exists.', err=True)
     else:
         project = Project(config)
-        project.generate_all(run_tests=tests)
+        project.generate_all(run_tests=run_tests, seal_students_nb=(not skip_seal))
         assignments =  project.all_assignments()
     return assignments
     
@@ -93,26 +96,34 @@ def __extract_questions(names: list[str]):
 @click.command()
 @_verbosity
 @click.option('-t', '--timeout', default=None, show_default=True, type=float, help='time after the grading of a notebook will be terminated')
+@click.option('-p', '--plot', default= False, is_flag=True, show_default=True, type=bool, help='plot the grading overview.')
 @click.argument('names', nargs=-1)
-def grade(timeout: float, names: list[str]):
-    return __grade(timeout, names)
+def grade(timeout: float, plot: bool, names: list[str]):
+    """
+    Grades all (Moodle) submissions.
+
+    \b
+    Args:
+        timeout (float): time after the execution of a notebook gets terminated
+        names (list[str]): assignment names that shoud be graded
+    """
+    __grade(timeout, plot, names)
 
 
-def __grade(timeout: float, names: list[str]):
+def __grade(timeout: float, plot: bool, names: list[str]):
     config = load_config()
     assignments = []
-    print(f'grading {names}')
     if len(names) > 0:
         for name in names:
             assignment = Assignment(config, name)
             if assignment.main_notebook_exists():
-                assignment.grade(timeout=timeout)
+                assignment.grade(timeout=timeout, plot=plot)
             else:
                 click.echo(
                     f'main notebook for {assignment} does not exists.', err=True)
     else:
         project = Project(config)
-        project.grade_all(timeout=timeout)
+        project.grade_all(timeout=timeout, plot=plot)
         assignments = project.all_assignments()
     return assignments
 
@@ -145,23 +156,63 @@ def __grade(timeout: float, names: list[str]):
 @click.command()
 @_verbosity
 @click.argument('n', type=int)
-@click.argument('names', nargs=-1)
-def add_questions(n, names: list[str]):
+@click.argument('assigments', nargs=-1)
+def add_empty_questions(n: int, assigments: list[str]):
     """
-    Initializes the complete ograder project, i.e., directory structure using the ograder.yml file in your home directory.
+    Adds n empty questions to notebooks.
+    
+    \b
+    Args:
+        n (int): number of questions
+        names (list[str]): list of assignments
     """
-
     config = load_config()
-    if len(names) > 0:
-        for name in names:
+    if len(assigments) > 0:
+        for name in assigments:
             assignment = Assignment(config, name)
             if assignment.main_notebook_exists():
-                assignment.add_questions(n)
+                assignment.add_empty_questions(n)
             else:
                 click.echo(f'main notebook for {assignment} does not exists.', err=True)
     else:
         project = Project(config)
-        project.add_questions(n)
+        project.add_empty_questions(n)
+
+@click.command()
+@_verbosity
+@click.argument('n', type=int)
+@click.argument('assignment')
+@click.argument('topic')
+@click.argument('difficulty')
+def add_questions(n: int, assignment: str, topic: str, difficulty: str):
+    """
+    Adds n questions including the solution and unit tests all generated by ChatGPT.
+
+    \b
+    Args:
+        n (int): number of questions
+        assignment (str): name of the assignment
+        topic (str): topic for which exercises should be generated
+        difficulty (str): difficulty level, e.g. 'easy', 'hard'
+    """
+
+    config = load_config()
+    assignment = Assignment(config, assignment)
+    
+    with open('api.key', 'r') as api_key:
+        API_KEY = api_key.read()
+    
+    difficulty = 'hard'
+    topic = 'dictionary'
+    
+    chat_gpt = ChatGPT(API_KEY)
+    exercises = chat_gpt.question(n, topic, difficulty)
+    
+    print(exercises)
+    
+    for exercise in exercises:
+        print(exercise)
+        assignment.add_question(exercise['question'], exercise['solution'], exercise['tests'])
 
 @click.command()
 @_verbosity
@@ -196,6 +247,7 @@ cli.add_command(upgrade)
 cli.add_command(assign)
 cli.add_command(grade)
 cli.add_command(add_questions)
+cli.add_command(add_empty_questions)
 #cli.add_command(extract_questions)
 
 if __name__ == '__main__':

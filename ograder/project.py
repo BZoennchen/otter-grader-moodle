@@ -39,15 +39,19 @@ class Project:
         for assignment in self.assignments:
             assignment.init_notebook(n, save=True, override=override, exist_ok=exist_ok)
     
-    def add_questions(self, n: int):
+    def add_empty_questions(self, n: int):
         for exercise in self.exercises:
-            exercise.add_questions(n)
+            exercise.add_empty_questions(n)
             
         for assignment in self.assignments:
-            assignment.add_questions(n)
+            assignment.add_empty_questions(n)
     
-    def grade_all(self, timeout=None):
-        pass
+    def grade_all(self, timeout=None, plot=False):
+        for exercise in self.exercises:
+            exercise.grade(timeout=timeout, plot=plot)
+            
+        for assignment in self.assignments:
+            assignment.grade(timeout=timeout, plot=plot)
     
     def upgrade_notebooks(self, n=0) -> None:
         for exercise in self.exercises:
@@ -56,12 +60,12 @@ class Project:
         for assignment in self.assignments:
             assignment.upgrade_notebook(n)
     
-    def generate_all(self, run_tests=True) -> None:
+    def generate_all(self, run_tests=True, seal_students_nb=True) -> None:
         for exercise in self.exercises:
-            exercise.generate(run_tests=run_tests)
+            exercise.generate(run_tests=run_tests, seal_student_nb=seal_students_nb)
             
         for assignment in self.assignments:
-            assignment.generate(run_tests=run_tests)
+            assignment.generate(run_tests=run_tests, seal_student_nb=seal_students_nb)
     
     def read_questions(self) -> None:
         for exercise in self.exercises:

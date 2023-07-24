@@ -11,6 +11,17 @@ from ograder.config import Config
 from ograder.local_grader import LocalGrader
 import warnings
 
+MARK_SEAL = '# SEAL'
+
+MARK_BEGIN_QUESTION = '# BEGIN QUESTION'
+MARK_END_QUESTION = '# END QUESTION'
+MARK_BEGIN_SOLUTION = '# BEGIN SOLUTION'
+MARK_END_SOLUTION = '# END SOLUTION'
+MARK_BEGIN_TESTS = '# BEGIN TESTS'
+MARK_END_TESTS = '# END TESTS'
+
+EXERCISE_ABBR = 'Aufgabe'
+
 LOGGER = loggers.get_logger(__name__)
 
 class Question():
@@ -46,20 +57,20 @@ class Assignment():
         self.autograder_dir : Path = config.assign.autograder_dir / Path(name)
         self.submission_dir: Path = config.assign.submission_dir / Path(name)
         self.tmp_dir : Path = config.assign.tmp_dir / Path(name)
-        #self.notebook = self.__read_notebook(self.main_dir)
+        #self.notebook = self.__read_main_notebook(self.main_dir)
         
     def upgrade_notebook(self, n=0) -> None:
         requires_update = False
-        notebook = self.__read_notebook()
+        notebook = self.__read_main_notebook()
         if notebook == None:
             LOGGER.info(f'Could not upgrade notebook for assignment {self}, since it does not exists. Therefore it will be initialized.')
             notebook = self.init_notebook(n, save=True)
-            #notebook = self.__read_notebook()
+            #notebook = self.__read_main_notebook()
             requires_update = True
         else:
             questions = self.read_questions(notebook)
             if n > len(questions):
-                self.add_questions(n-len(questions), notebook)
+                self.add_empty_questions(n-len(questions), notebook)
                 requires_update = True
         
         cells = notebook.cells
@@ -103,7 +114,7 @@ class Assignment():
             notebook.nbformat_minor = 5
             
             notebook = self.__normalize(notebook)
-            self.__save(notebook, override=True, exist_ok=True)
+            self.__write_to_main_nb(notebook, override=True, exist_ok=True)
         else:
             LOGGER.info(f'No update required for {self}.')
         
@@ -114,7 +125,7 @@ class Assignment():
     def __to_otter_meta(self, raw):
         return '# ASSIGNMENT CONFIG\n' + raw
     
-    def __question_cells(self, n:int, k:int=0):
+    def __question_cells(self, n:int, k:int=0, description:str='', solution:str='', tests:list[str]=[]):
         points = 1
         #k = len(self.read_questions())
         cells = []
@@ -123,44 +134,50 @@ class Assignment():
             cell = nbformat.v4.new_raw_cell(q_begin)
             cells.append(cell)
             
-            q_question_text = f'***Aufgabe {i+1+k}.***'
+            q_question_text = f'***{EXERCISE_ABBR} {i+1+k}.*** {description}'
             cell = nbformat.v4.new_markdown_cell(q_question_text)
             cells.append(cell)
-            
-            q_begin_sol = f'# BEGIN SOLUTION'
-            cell = nbformat.v4.new_raw_cell(q_begin_sol)
+
+            cell = nbformat.v4.new_raw_cell(MARK_BEGIN_SOLUTION)
             cells.append(cell)
             
-            cell = nbformat.v4.new_code_cell()
+            cell = nbformat.v4.new_code_cell(solution)
+            cells.append(cell)
+
+            cell = nbformat.v4.new_raw_cell(MARK_END_SOLUTION)
+            cells.append(cell)
+
+            cell = nbformat.v4.new_raw_cell(MARK_BEGIN_TESTS)
             cells.append(cell)
             
-            q_end_sol = f'# END SOLUTION'
-            cell = nbformat.v4.new_raw_cell(q_end_sol)
+            if len(tests) <= 0:
+                cell = nbformat.v4.new_code_cell()
+                cells.append(cell)
+            else:
+                for test in tests:
+                    cell = nbformat.v4.new_code_cell(test)
+                    cells.append(cell)
+
+            cell = nbformat.v4.new_raw_cell(MARK_END_TESTS)
             cells.append(cell)
             
-            q_begin_tests = f'# BEGIN TESTS'
-            cell = nbformat.v4.new_raw_cell(q_begin_tests)
-            cells.append(cell)
-            
-            cell = nbformat.v4.new_code_cell()
-            cells.append(cell)
-            
-            q_end_tests = f'# END TESTS'
-            cell = nbformat.v4.new_raw_cell(q_end_tests)
-            cells.append(cell)
-            
-            q_end = f'# END QUESTION'
-            cell = nbformat.v4.new_raw_cell(q_end)
+            cell = nbformat.v4.new_raw_cell(MARK_END_QUESTION)
             cells.append(cell)
         return cells
     
-    def add_questions(self, n: int, notebook=None, save=True) -> None:
+    def add_question(self, description:str, solution:str, tests:list[str]):
+        notebook = self.__read_main_notebook()
+        cells = notebook.cells
+        cells.extend(self.__question_cells(1, len(self.read_questions(notebook)), description, solution, tests))
+        self.__write_to_main_nb(notebook, override=True, exist_ok=True)
+    
+    def add_empty_questions(self, n: int, notebook=None, save=True) -> None:
         if notebook == None:
-            notebook = self.__read_notebook()
+            notebook = self.__read_main_notebook()
         cells = notebook.cells
         cells.extend(self.__question_cells(n, len(self.read_questions(notebook))))
         if save:
-            self.__save(notebook, override=True, exist_ok=True)
+            self.__write_to_main_nb(notebook, override=True, exist_ok=True)
         
         
     def init_notebook(self, n=0, save=True, override=False, exist_ok=False) -> nbformat.NotebookNode:
@@ -179,6 +196,8 @@ class Assignment():
         cells.extend(self.__question_cells(n))
         
         notebook = nbformat.v4.new_notebook(cells=cells)
+        notebook.metadata.kernelspec = nbformat.NotebookNode(language = 'python', name = 'python3', display_name='Python 3')
+        #notebook.kernelspec.name = 'python3'
         #notebook.metadata['kernelspec'] = {'language': 'python', 'name': 'python3'}
         # to avoid nbformat warning when otter removes ids, this is a little hacky
         notebook.nbformat = 4
@@ -186,21 +205,27 @@ class Assignment():
         
         notebook = self.__normalize(notebook)
         if save:
-            self.__save(notebook, override, exist_ok)
+            self.__write_to_main_nb(notebook, override, exist_ok)
         return notebook
     
-    def grade(self, timeout=None):
-        result_dir = self.submission_dir / Path('results')
-        result_dir.mkdir(parents=True, exist_ok=True)
-        grader = LocalGrader(self.autograder_dir, self.submission_dir, result_dir) # TODO: result_dir is currently unused
-        grader.grade(moodle_assignment=True, timeount_in_seconds=timeout)
+    def grade(self, timeout=None, plot=False):
+        self.submission_dir.mkdir(parents=True, exist_ok=True)
+        grader = LocalGrader(self.autograder_dir, self.submission_dir)
+        manual_questions = self.get_manual_questions()
+        grader.grade(manual_questions, moodle_assignment=True, timeount_in_seconds=timeout, plot=plot)
     
-    def __save(self, notebook, override=False, exist_ok=False) -> None:
-        self.main_dir.mkdir(parents=True, exist_ok=True)
-        if self.main_notebook_exists():
-            notebook_path = self.__find_notebook(self.main_dir)
+    def __write_to_student_nb(self, notebook, override=False, exist_ok=False) -> None:
+        self.__write(self.student_dir, notebook, override, exist_ok)
+    
+    def __write_to_main_nb(self, notebook, override=False, exist_ok=False) -> None:
+        self.__write(self.main_dir, notebook, override, exist_ok)
+                
+    def __write(self, path: Path, notebook: nbformat.NotebookNode, override=False, exist_ok=False):
+        path.mkdir(parents=True, exist_ok=True)
+        if self.__notebook_exists(path):
+            notebook_path = self.__find_notebook(path)
         else:
-            notebook_path = self.main_dir / Path(self.name + '.ipynb')
+            notebook_path = path / Path(self.name + '.ipynb')
             
         if notebook_path.exists() and override:
             notebook_path.unlink()
@@ -216,7 +241,7 @@ class Assignment():
                     LOGGER.error(f'Could not write to {notebook_path}.')
                     raise e
     
-    def generate(self, run_tests:bool=True) -> None:        
+    def generate(self, run_tests:bool=True, seal_student_nb=True) -> None:        
         try:
             # remove all generated noteobook if they are there
             self.remove_notebooks()
@@ -255,15 +280,43 @@ class Assignment():
             shutil.rmtree(str(self.tmp_dir))
             LOGGER.info( f'removed {self.tmp_dir}')
             
+            if seal_student_nb:
+                notebook = self.__seal_notebook(self.__read_student_notebook())
+                self.__write_to_student_nb(notebook, override=True, exist_ok=True)
+            
+            LOGGER.info( f'sealed student notebook')
+            
         except subprocess.CalledProcessError as error:
-            LOGGER.error(f'otter assign failed for assignment {self}: {error}')
-        except Exception as error:
-            LOGGER.error(f'otter assign failed for assignment {self}: {error}')
+            LOGGER.error(f'otter assign failed for assignment {self}: {error.output}')
+        #except Exception as error:
+        #    LOGGER.error(f'otter assign failed for assignment {self}: {error}')
+             
+    def __seal_notebook(self, notebook: nbformat.NotebookNode):
+        """
+        Makes markdowncells or cells marked as sealed undeletable and uneditable.
+        It makes all other cells undeletable.
+
+        Args:
+            notebook (nbformat.NotebookNode): the notebook that will be sealed
+        """
+        cells = notebook.cells
+        for cell in cells:
+            cell.metadata.deletable = False
+            if cell.cell_type == 'markdown' or cell.source.startswith(MARK_SEAL):
+                cell.metadata.editable = False
+                #cell.metadata.deletable = False
+            if cell.source.startswith(MARK_SEAL):
+                cell.source = cell.source[len(MARK_SEAL):]
+                cell.source = cell.source.lstrip('\n')
+        return notebook
+     
+    def __notebook_exists(self, path: Path):
+        if path.exists():
+            return not is_empty(path.glob('*.ipynb'))
+        return False
              
     def main_notebook_exists(self) -> bool:
-        if self.main_dir.exists():
-            return not is_empty(self.main_dir.glob('*.ipynb'))
-        return False
+        return self.__notebook_exists(self.main_dir)
      
     def remove_notebooks(self, main=False) -> None:
         self.remove_student_notebook()
@@ -296,11 +349,22 @@ class Assignment():
     
     ####### TODO Refectoring
     
-    def find_key(self, label, split, default=None):
+    def __find_key(self, cell, label, default=None):
+        split = cell.source.split('\n')
         for line in split:
             if line.startswith(label):
-                return line.split(':')[1]
+                return line.split(':')[1].strip()
         return default
+    
+    def get_manual_questions(self, notebook=None) -> list[str]:
+        questions_cells = self.read_questions(notebook)
+        manual_questions = []
+        for question_cells in questions_cells:
+            # the first cell of the question_cells contains the meta information!
+            name = self.__find_key(question_cells[0], 'name')
+            if self.__find_key(question_cells[0], 'manual') == 'true':
+                manual_questions.append(name)
+        return manual_questions
     
     def read_questions(self, notebook=None):
         """
@@ -311,7 +375,7 @@ class Assignment():
             list: list of list of cells, i.e, the partition.
         """
         if notebook == None:
-            notebook = self.__read_notebook()
+            notebook = self.__read_main_notebook()
         
         cells = notebook.cells
         
@@ -324,12 +388,6 @@ class Assignment():
             if cell.source.startswith('# BEGIN QUESTION'):
                 i_start = i
                 i_end = None
-                #split = cell.source.split('\n')
-                #meta_begin_question = split[0]
-                #name = self.find_key('name', split)
-                #points = self.find_key('points', split)
-                #manual = self.find_key('manual', split, 'false')
-                #print(f'{name} {points} {manual}')
                 
             if cell.source.endswith('# END QUESTION'):
                 i_end = i
@@ -340,8 +398,7 @@ class Assignment():
     #######
     
     
-    def __read_notebook(self) -> nbformat.NotebookNode:
-        path_to_notebook, _ = peek(self.main_dir.glob('*.ipynb'))
+    def __read_notebook(self, path_to_notebook: Path) -> nbformat.NotebookNode:
         if path_to_notebook != None:
             #print(path_to_notebook)
             with open(path_to_notebook, mode='r', encoding='utf-8') as file:
@@ -351,6 +408,14 @@ class Assignment():
                 except Exception as e:
                     LOGGER.error(f'Could not read from {file}')
                     return None
+     
+    def __read_student_notebook(self) -> nbformat.NotebookNode:
+        path_to_notebook, _ = peek(self.student_dir.glob('*.ipynb'))
+        return self.__read_notebook(path_to_notebook)
+        
+    def __read_main_notebook(self) -> nbformat.NotebookNode:
+        path_to_notebook, _ = peek(self.main_dir.glob('*.ipynb'))
+        return self.__read_notebook(path_to_notebook)
         
     def __find_notebook(self, dir : Path) -> Path:
         return peek(dir.glob('*.ipynb'))[0]
