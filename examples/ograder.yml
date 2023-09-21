@@ -1,0 +1,53 @@
+semester: WS2022
+root_dir: '/Users/bzoennchen/repositories/GitHub/otter-grader-moodle/test'
+exercises:
+  - exercise: training00
+    instructions: null
+  - exercise: training01
+    instructions: null
+  - exercise: training02
+    instructions: null
+  - exercise: training04
+    instructions: null
+  - exercise: training05
+    instructions: null
+  - exercise: training07
+    instructions: null
+assignments:
+  - exercise: assignment00
+    instructions: "Dieses Notebook ist eine **Abgabe**, die Sie bis zum **13. November um 23:00 Uhr** in Moodle abgegeben haben müssen!"
+  - exercise: training06
+    instructions: "Dieses Notebook ist eine **Abgabe**, die Sie bis zum **4. Dezember um 23:00 Uhr** in Moodle abgegeben haben müssen!"
+  - exercise: training08
+    instructions: "Dieses Notebook ist eine **Abgabe**, die Sie bis zum **18. Dezember um 23:00 Uhr** in Moodle abgegeben haben müssen!"
+git:
+  students:
+    jupyterhub_url: 'https://datahub.cs.hm.edu/'
+    git_hub_repo: 'https://github.com/BZoennchen/ct-ws2023-students'
+    git_lab_repo: 'https://gitlab.lrz.de/computational-thinking/computational-thinking-ws-2023-students'
+    git_hub_branch: 'main'
+    git_lab_branch: 'main'
+    path: ''
+    git: 'lab/tree/ct-ws2023-students/'
+  main:
+    git_lab_repo: 'https://gitlab.lrz.de/computational-thinking/computational-thinking'
+    path: 'notebooks/traineeship/WS2023'
+assign:
+  tmp_dir: tmp
+  main_dir: main
+  students_dir: students
+  solutions_dir: solutions
+  autograder_dir: autograder
+  submission_dir: submission
+otter_notebook_config:
+  init_cell: true
+  solutions_pdf: false
+  check_all_cell: true
+  generate:
+      zips: true
+  export_cell:
+      instructions: "Dieses Notebook ist zur reinen Übung gedacht und muss nicht abgegeben werden. Wir raten Ihnen eindringlich alle Aufgaben zu lösen!"
+      force_save: false
+      pdf: false
+  tests:
+      ok_format: false

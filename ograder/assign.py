@@ -284,7 +284,7 @@ class Assignment():
                 notebook = self.__seal_notebook(self.__read_student_notebook())
                 self.__write_to_student_nb(notebook, override=True, exist_ok=True)
             
-            LOGGER.info( f'sealed student notebook')
+            LOGGER.info(f'sealed student notebook')
             
         except subprocess.CalledProcessError as error:
             LOGGER.error(f'otter assign failed for assignment {self}: {error.output}')
